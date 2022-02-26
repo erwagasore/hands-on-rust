@@ -1,82 +1,77 @@
-use std::io::stdin;
+use bracket_lib::prelude::*;
 
-#[derive(Debug)]
-enum VisitorAction {
-    Accept,
-    AcceptWithNote { note: String },
-    Probation,
-    Refuse,
+enum GameMode {
+    Menu,
+    Playing,
+    End,
 }
 
-#[derive(Debug)]
-struct Visitor {
-    name: String,
-    action: VisitorAction,
-    age: i8,
+struct State {
+    mode: GameMode,
 }
 
-impl Visitor {
-    fn new(name: &str, action: VisitorAction, age: i8) -> Self {
-        Self {
-            name: name.to_lowercase(),
-            action,
-            age,
+impl State {
+    fn new() -> Self {
+        State {
+            mode: GameMode::Menu,
         }
     }
 
-    fn greet(&self) {
-        match &self.action {
-            VisitorAction::Accept => println!("Welcome to the treehouse, {}", self.name),
-            VisitorAction::AcceptWithNote { note } => {
-                println!("Welcome to the treehouse, {}", self.name);
-                println!("{}", note);
-                if self.age < 21 {
-                    println!("Do not serve alchool to {}", self.name);
-                }
+    fn restart(&mut self) {
+        self.mode = GameMode::Playing;
+    }
+
+    fn main_menu(&mut self, ctx: &mut BTerm) {
+        ctx.cls();
+        ctx.print_centered(5, "Welcome to Flappy Dragon");
+        ctx.print_centered(8, "(P) Play Game");
+        ctx.print_centered(9, "(Q) Quit Game");
+
+        if let Some(key) = ctx.key {
+            match key {
+                VirtualKeyCode::P => self.restart(),
+                VirtualKeyCode::Q => ctx.quitting = true,
+                _ => {}
             }
-            VisitorAction::Probation => println!("{} is now probetionary member", self.name),
-            VisitorAction::Refuse => println!("Do not allow {} in", self.name),
+        }
+    }
+
+    fn playing(&mut self, _ctx: &mut BTerm) {
+        // TODO: fill-in the stub later
+        self.mode = GameMode::End;
+    }
+
+    fn dead(&mut self, ctx:&mut BTerm) {
+        ctx.cls();
+        ctx.print_centered(5, "You are dead!");
+        ctx.print_centered(8, "(P) Play Game");
+        ctx.print_centered(9, "(Q) Quit Game");
+
+        if let Some(key) = ctx.key {
+            match key {
+                VirtualKeyCode::P => self.restart(),
+                VirtualKeyCode::Q => ctx.quitting = true,
+                _ => {}
+            }
+        }
+    }
+
+}
+
+impl GameState for State {
+    fn tick(&mut self, ctx: &mut BTerm) {
+        match self.mode {
+            GameMode::Menu => self.main_menu(ctx),
+            GameMode::End => self.dead(ctx),
+            GameMode::Playing => self.playing(ctx),
         }
     }
 }
 
-fn get_user_input() -> String {
-    let mut username = String::new();
-    stdin().read_line(&mut username).expect("Failed to read line");
-    username.trim().to_lowercase()
-}
+fn main() -> BError {
+    let context = BTermBuilder::simple80x50()
+        .with_title("Flappy Dragon")
+        .build()?;
 
-fn main() {
-    let mut visitors = vec![
-        Visitor::new("Bert", VisitorAction::Accept, 45),
-        Visitor::new("steve", VisitorAction::AcceptWithNote {
-            note: String::from("Lactose-free milk is in the fridge")
-        }, 15),
-        Visitor::new("Eugene", VisitorAction::Probation, 36),
-        Visitor::new("fred", VisitorAction::Refuse, 30),
-    ];
-
-    loop {
-         println!("Hello, what is your name? ");
-        let username = get_user_input();
-
-        let invited_visitor = visitors.iter().find(|visitor| visitor.name == username);
-
-        match invited_visitor {
-            Some(visitor) => visitor.greet(),
-            None if username.is_empty() => {
-                println!("The final list of visitors:");
-                println!("{:#?}", visitors);
-                break;
-            }
-            None => {
-                println!("{} is not on the visitor list", username);
-                visitors.push(
-                    Visitor::new(&username, VisitorAction::AcceptWithNote {
-                        note: String::from("Was not invited")
-                    }, 0)
-                );
-            }
-        }
-   }
+    main_loop(context, State::new())
 }
